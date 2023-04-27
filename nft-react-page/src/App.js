@@ -1,22 +1,27 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
 import ReactLoading from "react-loading";
 import "./App.css";
 import twitterLogo from "./assets/twitter-logo-2429.svg";
 import { ethers } from "ethers";
 import MyEpicNft from "./utils/MyEpicNft.json";
+import Canvas from "./components/randomNFT";
+import axios from "axios";
 
 // Constants
 const TWITTER_HANDLE = "JRetnakaran";
 const TWITTER_LINK = `https://twitter.com/${TWITTER_HANDLE}`;
-const OPENSEA_LINK = "https://testnets.opensea.io/collection/blacksquarenft-4";
+const CONTRACT_ADDRESS = "0xcDe1bc2baA79421913103246e304CBf9888B464B";
+const OPENSEA_LINK = `https://testnets.opensea.io/collection/${CONTRACT_ADDRESS}`;
 const TOTAL_MINT_COUNT = 15;
-const CONTRACT_ADDRESS = "0xfEd26eaaAc4278598aD3f70f6553fE77b6b1bd54";
 
 const App = () => {
   const [currentAccount, setCurrentAccount] = useState("");
   const [countMintedNFT, setCountMintedNFT] = useState("0");
   const [loading, setLoading] = useState(false);
   const [isMinted, setIsMinted] = useState(false);
+  const [ipfsHash, setIpfsHash] = useState("");
+  const [imageData, setImageData] = useState(null);
 
   const checkIfWalletIsConnected = async () => {
     const { ethereum } = window;
@@ -55,7 +60,6 @@ const App = () => {
       console.log(error);
     }
   };
-
   const connectWallet = async () => {
     try {
       const { ethereum } = window;
@@ -115,7 +119,8 @@ const App = () => {
         );
 
         console.log("Going to pop wallet now to pay gas...");
-        let nftTxn = await connectedContract.makeAnEpicNFT();
+        await sendFileToIPFS();
+        let nftTxn = await connectedContract.makeAnEpicNFT(ipfsHash);
         setLoading(true);
         console.log("Mining...please wait.");
         await nftTxn.wait();
@@ -132,7 +137,33 @@ const App = () => {
       console.log(error);
     }
   };
-  // Render Methods
+  const sendFileToIPFS = async (e) => {
+    if (imageData) {
+      try {
+        console.log(imageData);
+
+        const formData = new FormData();
+        formData.append("file", imageData);
+        const resFile = await axios({
+          method: "post",
+          url: "https://api.pinata.cloud/pinning/pinFileToIPFS",
+          data: formData,
+          headers: {
+            'pinata_api_key': `${process.env.REACT_APP_PINATA_API_KEY}`,
+            'pinata_secret_api_key': `${process.env.REACT_APP_PINATA_API_SECRET}`,
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        const ImgHash = `ipfs://${resFile.data.IpfsHash}`;
+        // console.log(ImgHash);
+        setIpfsHash(ImgHash);
+        //Take a look at your Pinata Pinned section, you will see a new file added to you list.
+      } catch (error) {
+        console.log("Error sending File to IPFS: ");
+        console.log(error);
+      }
+    }
+  };
   const renderNotConnectedContainer = () => (
     <button
       onClick={connectWallet}
@@ -141,16 +172,6 @@ const App = () => {
       Connect to Wallet
     </button>
   );
-
-  const renderMintUI = () => (
-    <button
-      onClick={askContractToMintNft}
-      className="cta-button connect-wallet-button"
-    >
-      Mint NFT
-    </button>
-  );
-
   const getTotalNFTsMintedSoFar = async () => {
     try {
       const { ethereum } = window;
@@ -173,9 +194,17 @@ const App = () => {
       console.log(error);
     }
   };
+
+  const getImageData = async (data) => {
+    console.log("Received data from canvas:", data);
+    setImageData(data);
+    console.log("Updated imagedata:", imageData);
+  };
+
   useEffect(() => {
     checkIfWalletIsConnected();
     checkNetworkChainId();
+    console.log(imageData);
   });
 
   return (
@@ -186,9 +215,21 @@ const App = () => {
           <p className="sub-text">
             Each unique. Each beautiful. Discover your NFT today.
           </p>
-          {currentAccount === ""
-            ? renderNotConnectedContainer()
-            : renderMintUI()}
+          {currentAccount === "" ? (
+            renderNotConnectedContainer()
+          ) : (
+            <div>
+              <Canvas onImageGenerated={getImageData} />
+              {imageData && (
+                <button
+                  onClick={askContractToMintNft}
+                  className="cta-button connect-wallet-button"
+                >
+                  Mint NFT
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div>
           {loading ? (
@@ -203,8 +244,15 @@ const App = () => {
             <div>
               {isMinted ? (
                 <div className="sub-text">
-                  NFT successfully minted.<br/>
-                  <a href={OPENSEA_LINK} target="_blank" rel="noopener noreferrer">Click to View</a>
+                  NFT successfully minted.
+                  <br />
+                  <a
+                    href={OPENSEA_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Click to View
+                  </a>
                 </div>
               ) : (
                 ""
@@ -232,3 +280,12 @@ const App = () => {
 };
 
 export default App;
+
+// const renderMintUI = () => (
+//   <button
+//     onClick={askContractToMintNft}
+//     className="cta-button connect-wallet-button"
+//   >
+//     Mint NFT
+//   </button>
+// );
