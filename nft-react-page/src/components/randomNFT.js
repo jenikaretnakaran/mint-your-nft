@@ -97,13 +97,11 @@ const Canvas = ({ onImageGenerated }) => {
     ctx.textAlign = "center";
     ctx.fillText(randomWords, canvas.width / 2, canvas.height / 2);
 
-    console.log(randomColor, randomWords);
-
     // Create metadata object
     const metadata = {
       name: randomWords,
       description: "A random image with random words and colour",
-      image: null, //set later
+      image: canvas.toDataURL(),
       attributes: [
         {
           trait_type: "Background colour",
@@ -115,22 +113,17 @@ const Canvas = ({ onImageGenerated }) => {
         },
       ],
     };
-
-    console.log(metadata);
-
-    const imageData = canvas.toDataURL();
-
-    // Create IPFS object with metadata and imagedata
-    const ipfsObject = {
-      metadata,
-      image: {
-        data: imageData,
-        type: "image/png",
-      },
-    };
-    console.log("Generated IPFS object:", ipfsObject);
-    onImageGenerated(ipfsObject);
-    console.log(ipfsObject);
+    // Convert canvas to blob
+    canvas.toBlob((blob) => {
+        const ipfsObject = {
+            metadata,
+            image: {
+                data: blob,
+                type: "image/jpeg",
+            },
+        };
+        onImageGenerated(ipfsObject);
+    }, "image/jpeg");
   },[]);
 
   return <canvas ref={canvasRef} width="400" height="400"/>
